@@ -426,17 +426,13 @@
             const clearCompletedBtn = document.getElementById('clearCompleted');
             const particlesContainer = document.getElementById('particles');
 
-            // API Configuration
-            const API_URL = 'http://localhost:5000/api';
-            let token = localStorage.getItem('nexusTaskToken');
-
             // State
-            let tasks = [];
+            let tasks = JSON.parse(localStorage.getItem('nexusTasks')) || [];
             let currentFilter = 'all';
 
             // Initialize
-            checkAuth();
             createParticles();
+            renderTasks();
 
             // Event Listeners
             addTaskBtn.addEventListener('click', addTask);
@@ -456,81 +452,33 @@
             clearCompletedBtn.addEventListener('click', clearCompletedTasks);
 
             // Functions
-            async function checkAuth() {
-                if (!token) {
-                    // For demo purposes, we'll auto-login with a test user
-                    // In a real app, you'd have a proper login flow
-                    try {
-                        const response = await fetch(`${API_URL}/auth/login`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                email: 'test@example.com',
-                                password: 'password123'
-                            })
-                        });
-                        
-                        const data = await response.json();
-                        token = data.access_token;
-                        localStorage.setItem('nexusTaskToken', token);
-                        loadTasks();
-                    } catch (error) {
-                        console.error('Login failed:', error);
-                    }
-                } else {
-                    loadTasks();
-                }
+            function saveTasks() {
+                localStorage.setItem('nexusTasks', JSON.stringify(tasks));
             }
 
-            async function loadTasks() {
-                try {
-                    const response = await fetch(`${API_URL}/tasks`, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
-                    });
-                    tasks = await response.json();
-                    renderTasks();
-                } catch (error) {
-                    console.error('Error loading tasks:', error);
-                }
-            }
-
-            async function addTask() {
+            function addTask() {
                 const text = taskInput.value.trim();
                 if (text) {
-                    try {
-                        const response = await fetch(`${API_URL}/tasks`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${token}`
-                            },
-                            body: JSON.stringify({
-                                text,
-                                completed: false
-                            })
-                        });
-                        
-                        const newTask = await response.json();
-                        tasks.unshift(newTask);
-                        renderTasks();
-                        taskInput.value = '';
-                        taskInput.focus();
-                        
-                        // Animation for new task
-                        if (taskList.firstChild) {
-                            taskList.firstChild.style.transform = 'scale(1.05)';
-                            taskList.firstChild.style.boxShadow = '0 0 20px rgba(0, 240, 255, 0.5)';
-                            setTimeout(() => {
-                                taskList.firstChild.style.transform = '';
-                                taskList.firstChild.style.boxShadow = '';
-                            }, 300);
-                        }
-                    } catch (error) {
-                        console.error('Error adding task:', error);
+                    const newTask = {
+                        id: Date.now(),
+                        text,
+                        completed: false
+                    };
+                    
+                    tasks.unshift(newTask);
+                    saveTasks();
+                    renderTasks();
+                    taskInput.value = '';
+                    taskInput.focus();
+                    
+                    // Animation for new task
+                    if (taskList.firstChild) {
+                        taskList.firstChild.style.transform = 'scale(1.05)';
+                        taskList.firstChild.style.boxShadow = '0 0 20px rgba(0, 240, 255, 0.5)';
+                        setTimeout(() => {
+                            taskList.firstChild.style.transform = '';
+                            taskList.firstChild.style.boxShadow = '';
+                        }, 300);
                     }
                 }
             }
@@ -579,50 +527,34 @@
                 });
             }
 
-            async function toggleTask(e) {
+            function toggleTask(e) {
                 const taskId = parseInt(e.target.closest('.task-item').dataset.id);
                 const task = tasks.find(task => task.id === taskId);
                 
                 if (task) {
-                    try {
-                        const response = await fetch(`${API_URL}/tasks/${taskId}`, {
-                            method: 'PUT',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${token}`
-                            },
-                            body: JSON.stringify({
-                                text: task.text,
-                                completed: e.target.checked
-                            })
-                        });
-                        
-                        const updatedTask = await response.json();
-                        task.completed = updatedTask.completed;
-                        renderTasks();
-                        
-                        // Animation
-                        const taskItem = e.target.closest('.task-item');
-                        if (task.completed) {
-                            taskItem.style.transform = 'scale(0.98)';
-                            taskItem.style.background = 'rgba(0, 255, 157, 0.1)';
-                            taskItem.style.borderColor = 'rgba(0, 255, 157, 0.3)';
-                        } else {
-                            taskItem.style.transform = 'scale(1.02)';
-                            taskItem.style.background = 'rgba(123, 45, 255, 0.1)';
-                            taskItem.style.borderColor = 'rgba(123, 45, 255, 0.3)';
-                        }
-                        
-                        setTimeout(() => {
-                            taskItem.style.transform = '';
-                        }, 300);
-                    } catch (error) {
-                        console.error('Error updating task:', error);
+                    task.completed = e.target.checked;
+                    saveTasks();
+                    renderTasks();
+                    
+                    // Animation
+                    const taskItem = e.target.closest('.task-item');
+                    if (task.completed) {
+                        taskItem.style.transform = 'scale(0.98)';
+                        taskItem.style.background = 'rgba(0, 255, 157, 0.1)';
+                        taskItem.style.borderColor = 'rgba(0, 255, 157, 0.3)';
+                    } else {
+                        taskItem.style.transform = 'scale(1.02)';
+                        taskItem.style.background = 'rgba(123, 45, 255, 0.1)';
+                        taskItem.style.borderColor = 'rgba(123, 45, 255, 0.3)';
                     }
+                    
+                    setTimeout(() => {
+                        taskItem.style.transform = '';
+                    }, 300);
                 }
             }
 
-            async function editTask(e) {
+            function editTask(e) {
                 const taskItem = e.target.closest('.task-item');
                 const taskId = parseInt(taskItem.dataset.id);
                 const task = tasks.find(task => task.id === taskId);
@@ -641,29 +573,12 @@
                     taskText.replaceWith(input);
                     input.focus();
                     
-                    const finishEdit = async () => {
+                    const finishEdit = () => {
                         const newText = input.value.trim();
                         if (newText && newText !== currentText) {
-                            try {
-                                const response = await fetch(`${API_URL}/tasks/${taskId}`, {
-                                    method: 'PUT',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'Authorization': `Bearer ${token}`
-                                    },
-                                    body: JSON.stringify({
-                                        text: newText,
-                                        completed: task.completed
-                                    })
-                                });
-                                
-                                const updatedTask = await response.json();
-                                task.text = updatedTask.text;
-                                renderTasks();
-                            } catch (error) {
-                                console.error('Error updating task:', error);
-                                renderTasks();
-                            }
+                            task.text = newText;
+                            saveTasks();
+                            renderTasks();
                         } else {
                             renderTasks();
                         }
@@ -676,7 +591,7 @@
                 }
             }
 
-            async function deleteTask(e) {
+            function deleteTask(e) {
                 const taskId = parseInt(e.target.closest('.task-item').dataset.id);
                 const taskIndex = tasks.findIndex(task => task.id === taskId);
                 
@@ -686,24 +601,16 @@
                     taskItem.style.transform = 'scale(0.9)';
                     taskItem.style.opacity = '0';
                     
-                    try {
-                        await fetch(`${API_URL}/tasks/${taskId}`, {
-                            method: 'DELETE',
-                            headers: {
-                                'Authorization': `Bearer ${token}`
-                            }
-                        });
-                        
-                        tasks.splice(taskIndex, 1);
+                    tasks.splice(taskIndex, 1);
+                    saveTasks();
+                    
+                    setTimeout(() => {
                         renderTasks();
-                    } catch (error) {
-                        console.error('Error deleting task:', error);
-                        renderTasks();
-                    }
+                    }, 300);
                 }
             }
 
-            async function clearCompletedTasks() {
+            function clearCompletedTasks() {
                 // Animation
                 document.querySelectorAll('.task-item').forEach(item => {
                     if (item.querySelector('.task-checkbox').checked) {
@@ -712,28 +619,11 @@
                     }
                 });
                 
-                try {
-                    // Delete all completed tasks
-                    await Promise.all(
-                        tasks
-                            .filter(task => task.completed)
-                            .map(task => 
-                                fetch(`${API_URL}/tasks/${task.id}`, {
-                                    method: 'DELETE',
-                                    headers: {
-                                        'Authorization': `Bearer ${token}`
-                                    }
-                                })
-                            )
-                    );
-                    
-                    // Update local tasks
+                setTimeout(() => {
                     tasks = tasks.filter(task => !task.completed);
+                    saveTasks();
                     renderTasks();
-                } catch (error) {
-                    console.error('Error clearing completed tasks:', error);
-                    renderTasks();
-                }
+                }, 300);
             }
 
             function createParticles() {
